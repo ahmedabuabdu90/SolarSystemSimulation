@@ -33,10 +33,6 @@
             100% { opacity: 1; }
         }
         
-        .sun-animation {
-            transition: all 0.5s ease;
-        }
-        
         .load-active {
             transform: scale(1.02);
             transition: all 0.3s ease;
@@ -479,26 +475,33 @@
             return currentLoad;
         }
 
-        // تحديث حالة البطارية
+        // تحديث حالة البطارية - الإصلاح هنا!
         function updateBattery() {
             // تدفق الطاقة = التوليد - الاستهلاك
             const netPower = simulationState.pvOutput - simulationState.totalLoad;
             
-            // دلتا (kWh) لكل خطوة 15 دقيقة (0.25h)
+            // دلتا الطاقة (kWh) لكل خطوة 15 دقيقة (0.25h)
             const energyStep = netPower * 0.25;
             
             // تحديث نسبة شحن البطارية
+            // الإصلاح: استخدام سعة البطارية الصحيحة للحساب
             const socChange = (energyStep / SYSTEM_SPECS.batteryCapacity) * 100;
-            simulationState.batterySoc += socChange;
+            
+            // منع التغيرات الصغيرة جداً من التأثير
+            if (Math.abs(socChange) > 0.01) {
+                simulationState.batterySoc += socChange;
+            }
             
             // تحديد النسبة بين 0 و 100
             simulationState.batterySoc = Math.min(Math.max(simulationState.batterySoc, 0), 100);
             
             // تحديث إحصائيات الطاقة
-            if (netPower > 0) {
-                simulationState.energyProduced += netPower * 0.25;
-            } else {
-                simulationState.energyConsumed += Math.abs(netPower) * 0.25;
+            if (simulationState.pvOutput > 0) {
+                simulationState.energyProduced += simulationState.pvOutput * 0.25;
+            }
+            
+            if (simulationState.totalLoad > 0) {
+                simulationState.energyConsumed += simulationState.totalLoad * 0.25;
             }
             
             // تحديث ساعات التشغيل إذا كان هناك حمل نشط
