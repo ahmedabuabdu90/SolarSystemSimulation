@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام محاكاة الطاقة الشمسية - مخيمات غزة</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
+        
+        body {
+            font-family: 'Tajawal', sans-serif;
+        }
+        
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+        }
+        
+        .glow {
+            animation: pulse-glow 2s infinite;
+        }
+        
+        .sun-animation {
+            transition: all 0.5s ease;
+        }
+        
+        .battery-warning {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div id="app" class="p-4">
+        <!-- Header -->
+        <div class="bg-white p-6 rounded-xl shadow-sm mb-6 border-b-4 border-blue-600">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-center md:text-right">
+                    <h1 class="text-2xl font-bold text-slate-800">نظام محاكاة الطاقة الشمسية (5kW)</h1>
+                    <p class="text-slate-500 text-sm">مشروع الطاقة الشمسية لمخيمات النازحين - قطاع غزة</p>
+                    <div class="mt-2 flex flex-wrap gap-2 justify-center">
+                        <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">100 وحدة شمسية</span>
+                        <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">50,000 مستفيد</span>
+                        <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">طاقة نظيفة</span>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-mono font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg dir-ltr">
+                        <span id="current-time">06:00 ص</span>
+                    </div>
+                    <button 
+                        id="simulation-toggle"
+                        class="mt-2 px-4 py-2 text-sm rounded-full w-full font-bold bg-green-100 text-green-600 transition-all hover:scale-105"
+                    >
+                        تشغيل المحاكاة ▶
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column: Generation & Storage -->
+            <div class="space-y-6">
+                <!-- PV Array Card -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                    <div id="pv-indicator" class="absolute top-0 left-0 w-2 h-full bg-slate-300"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-slate-700 flex items-center gap-2">
+                            <i data-lucide="sun" class="text-slate-400"></i>
+                            الألواح الشمسية
+                        </h3>
+                        <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded">5.5 kWp</span>
+                    </div>
+                    <div class="flex items-end gap-2 mb-2">
+                        <span id="pv-output" class="text-4xl font-bold text-slate-800">0.00</span>
+                        <span class="text-sm text-slate-500 mb-1">كيلو واط (توليد)</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div id="pv-progress" class="bg-yellow-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 flex justify-between">
+                        <span>0%</span>
+                        <span id="pv-efficiency">كفاءة: 0%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Battery Card -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                    <div id="battery-indicator" class="absolute top-0 left-0 w-2 h-full bg-green-500"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-lg text-slate-700 flex items-center gap-2">
+                            <i data-lucide="battery" class="text-green-600"></i>
+                            بطارية الليثيوم
+                        </h3>
+                        <span class="text-xs font-mono bg-slate-100 px-2 py-1 rounded">18 kWh</span>
+                    </div>
+                    <div class="flex items-end gap-2 mb-2">
+                        <span id="battery-soc" class="text-4xl font-bold text-slate-800">50%</span>
+                        <span class="text-sm text-slate-500 mb-1">نسبة الشحن</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-4 mb-1">
+                        <div id="battery-progress" class="h-4 rounded-full transition-all duration-300 bg-green-500" style="width: 50%"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 flex justify-between">
+                        <span>0%</span>
+                        <span id="battery-status">⚡ جاري الشحن</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+                
+                <!-- System Stats -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-700 mb-3 text-center">إحصائيات النظام</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-600">الطاقة المنتجة اليوم:</span>
+                            <span id="energy-produced" class="font-mono font-bold text-blue-600">0.00 kWh</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-600">الطاقة المستهلكة اليوم:</span>
+                            <span id="energy-consumed" class="font-mono font-bold text-orange-600">0.00 kWh</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-600">صافي الطاقة:</span>
+                            <span id="net-energy" class="font-mono font-bold text-green-600">0.00 kWh</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                            <span class="text-slate-600">ساعات التشغيل:</span>
+                            <span id="operation-hours" class="font-mono font-bold text-purple-600">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Column: System Flow -->
+            <div class="bg-slate-800 text-white p-6 rounded-xl shadow-lg flex flex-col justify-center items-center relative">
+                <h3 class="text-slate-400 text-sm font-bold uppercase mb-8 tracking-wider">نظام العاكس (Inverter)</h3>
+                
+                <div id="inverter" class="relative z-10 bg-slate-700 p-6 rounded-full border-4 border-blue-500 w-48 h-48 flex flex-col justify-center items-center text-center">
+                    <i data-lucide="zap" class="mb-2 text-slate-500" style="width: 32px; height: 32px;"></i>
+                    <div id="current-load" class="text-3xl font-bold font-mono">0.00</div>
+                    <div class="text-xs text-blue-200">kW Load</div>
+                    <div class="text-xs text-slate-400 mt-1">Capacity: 5.0kW</div>
+                </div>
+
+                <!-- Status Monitor -->
+                <div class="mt-8 w-full bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">حالة النظام:</span>
+                        <span id="system-status" class="font-bold px-2 py-1 rounded bg-green-900 text-green-400">
+                            مستقر
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm mt-2">
+                        <span class="text-slate-400">صافي التدفق:</span>
+                        <span id="net-flow" class="font-mono dir-ltr text-green-400">
+                            0.00 kW
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm mt-2">
+                        <span class="text-slate-400">درجة الحرارة:</span>
+                        <span id="system-temp" class="font-mono dir-ltr text-slate-300">
+                            25°C
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Day/Night Indicator -->
+                <div class="mt-6 flex items-center gap-4 bg-slate-700/50 p-3 rounded-lg">
+                    <div id="day-night-icon">
+                        <i data-lucide="sun" class="text-yellow-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400">الوقت الحالي</div>
+                        <div id="time-period" class="font-bold">نهار</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Loads Control -->
+            <div class="space-y-4">
+                <h3 class="font-bold text-slate-700 mb-2 text-center">التحكم بالأحمال (Loads)</h3>
+                
+                <!-- Pump Control -->
+                <div class="load-control">
+                    <button 
+                        id="pump-toggle"
+                        class="w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group border-slate-200 hover:border-slate-300 bg-white"
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-full bg-slate-100 text-slate-400">
+                                <i data-lucide="droplets"></i>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-slate-700">مضخة المياه</div>
+                                <div class="text-xs text-slate-500">1.5 kW - 4 ساعات/يوم</div>
+                            </div>
+                        </div>
+                        <div class="load-indicator w-3 h-3 rounded-full bg-slate-300"></div>
+                    </button>
+                    <div class="load-status mt-2 text-xs text-slate-500 text-center hidden">
+                        <span>⏱️ تعمل حتى 18:00</span>
+                    </div>
+                </div>
+
+                <!-- Lights Control -->
+                <div class="load-control">
+                    <button 
+                        id="lights-toggle"
+                        class="w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group border-slate-200 hover:border-slate-300 bg-white"
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-full bg-slate-100 text-slate-400">
+                                <i data-lucide="lightbulb"></i>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-slate-700">إنارة المخيم</div>
+                                <div class="text-xs text-slate-500">0.06 kW - 8 ساعات/ليل</div>
+                            </div>
+                        </div>
+                        <div class="load-indicator w-3 h-3 rounded-full bg-slate-300"></div>
+                    </button>
+                    <div class="load-status mt-2 text-xs text-slate-500 text-center hidden">
+                        <span>🌙 تعمل تلقائياً في المساء</span>
+                    </div>
+                </div>
+
+                <!-- Charging Control -->
+                <div class="load-control">
+                    <button 
+                        id="charging-toggle"
+                        class="w-full p-4 rounded-xl border-2 transition-all flex items-center justify-between group border-slate-200 hover:border-slate-300 bg-white"
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 rounded-full bg-slate-100 text-slate-400">
+                                <i data-lucide="smartphone"></i>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-bold text-slate-700">محطة الشحن</div>
+                                <div class="text-xs text-slate-500">0.2 kW - 100 جهاز/يوم</div>
+                            </div>
+                        </div>
+                        <div class="load-indicator w-3 h-3 rounded-full bg-slate-300"></div>
+                    </button>
+                    <div class="load-status mt-2 text-xs text-slate-500 text-center hidden">
+                        <span>🔋 متاحة عند توفر الطاقة</span>
+                    </div>
+                </div>
+
+                <!-- System Warnings -->
+                <div id="system-warnings" class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
+                    <div class="font-bold mb-1 flex items-center gap-2">
+                        <i data-lucide="info" class="w-4 h-4"></i>
+                        تعليمات التشغيل
+                    </div>
+                    <ul class="list-disc mr-4 mt-1 space-y-1">
+                        <li>المضخة تعمل نهاراً فقط (6:00 - 18:00)</li>
+                        <li>الإنارة تعمل تلقائياً ليلاً (18:00 - 6:00)</li>
+                        <li>محطة الشحن متاحة عندما تكون البطارية فوق 20%</li>
+                    </ul>
+                </div>
+
+                <!-- Impact Summary -->
+                <div class="mt-6 bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-xl border border-green-200">
+                    <h4 class="font-bold text-slate-800 text-center mb-3">الأثر الإنساني</h4>
+                    <div class="grid grid-cols-2 gap-3 text-center">
+                        <div class="bg-white p-2 rounded-lg">
+                            <div class="text-lg font-bold text-blue-600" id="water-beneficiaries">300</div>
+                            <div class="text-xs text-slate-600">مستفيد من المياه</div>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg">
+                            <div class="text-lg font-bold text-purple-600" id="light-beneficiaries">500</div>
+                            <div class="text-xs text-slate-600">مستفيد من الإنارة</div>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg">
+                            <div class="text-lg font-bold text-green-600" id="charge-beneficiaries">100</div>
+                            <div class="text-xs text-slate-600">جهاز مشحون/يوم</div>
+                        </div>
+                        <div class="bg-white p-2 rounded-lg">
+                            <div class="text-lg font-bold text-orange-600" id="co2-saved">12.5</div>
+                            <div class="text-xs text-slate-600">كجم CO2/يوم</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Project Info Footer -->
+        <div class="mt-8 bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
+            <p class="text-slate-600 text-sm">
+                مشروع الطاقة الشمسية لمخيمات النازحين في قطاع غزة - 100 وحدة طاقة شمسية بقدرة 5kW لتوفير خدمات أساسية لنحو 50,000 نازح
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // System Parameters based on project specs
+        const SYSTEM_SPECS = {
+            pvCapacity: 5.5, // kWp
+            batteryCapacity: 18, // kWh USABLE
+            inverterCapacity: 5.0, // kW
+            loads: {
+                pump: 1.5, // kW
+                lights: 0.06, // kW (3 * 20W)
+                charging: 0.20 // kW
+            }
+        };
+
+        // System Efficiency
+        const SYSTEM_EFFICIENCY = {
+            inverter: 0.95,
+            charging: 0.92,
+            discharge: 0.95
+        };
+
+        // Simulation State
+        let simulationState = {
+            time: 6, // Start at 6:00 AM
+            batterySoc: 50, // %
+            activeLoads: {
+                pump: false,
+                lights: false,
+                charging: false
+            },
+            isSimulating: false,
+            pvOutput: 0,
+            totalLoad: 0,
+            gridStatus: 'Normal',
+            energyProduced: 0,
+            energyConsumed: 0,
+            operationHours: 0
+        };
+
+        // DOM Elements
+        const elements = {
+            time: document.getElementById('current-time'),
+            simulationToggle: document.getElementById('simulation-toggle'),
+            pvOutput: document.getElementById('pv-output'),
+            pvProgress: document.getElementById('pv-progress'),
+            pvIndicator: document.getElementById('pv-indicator'),
+            pvEfficiency: document.getElementById('pv-efficiency'),
+            batterySoc: document.getElementById('battery-soc'),
+            batteryProgress: document.getElementById('battery-progress'),
+            batteryIndicator: document.getElementById('battery-indicator'),
+            batteryStatus: document.getElementById('battery-status'),
+            currentLoad: document.getElementById('current-load'),
+            systemStatus: document.getElementById('system-status'),
+            netFlow: document.getElementById('net-flow'),
+            systemTemp: document.getElementById('system-temp'),
+            inverter: document.getElementById('inverter'),
+            dayNightIcon: document.getElementById('day-night-icon'),
+            timePeriod: document.getElementById('time-period'),
+            energyProduced: document.getElementById('energy-produced'),
+            energyConsumed: document.getElementById('energy-consumed'),
+            netEnergy: document.getElementById('net-energy'),
+            operationHours: document.getElementById('operation-hours'),
+            systemWarnings: document.getElementById('system-warnings')
+        };
+
+        // Load control elements
+        const loadControls = {
+            pump: {
+                toggle: document.getElementById('pump-toggle'),
+                indicator: document.querySelector('#pump-toggle .load-indicator'),
+                status: document.querySelector('#pump-toggle').closest('.load-control').querySelector('.load-status')
+            },
+            lights: {
+                toggle: document.getElementById('lights-toggle'),
+                indicator: document.querySelector('#lights-toggle .load-indicator'),
+                status: document.querySelector('#lights-toggle').closest('.load-control').querySelector('.load-status')
+            },
+            charging: {
+                toggle: document.getElementById('charging-toggle'),
+                indicator: document.querySelector('#charging-toggle .load-indicator'),
+                status: document.querySelector('#charging-toggle').closest('.load-control').querySelector('.load-status')
+            }
+        };
+
+        // Beneficiary elements
+        const beneficiaryElements = {
+            water: document.getElementById('water-beneficiaries'),
+            light: document.getElementById('light-beneficiaries'),
+            charge: document.getElementById('charge-beneficiaries'),
+            co2: document.getElementById('co2-saved')
+        };
+
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Format time for display
+        function formatTime(t) {
+            const hours = Math.floor(t);
+            const minutes = Math.floor((t - hours) * 60);
+            const ampm = hours >= 12 ? 'مساءً' : 'ص';
+            const displayHours = hours % 12 || 12;
+            return `${displayHours}:${minutes < 10 ? '0' : ''}${minutes} ${ampm}`;
+        }
+
+        // Update time display
+        function updateTimeDisplay() {
+            elements.time.textContent = formatTime(simulationState.time);
+            
+            // Update day/night indicator
+            const isDaytime = simulationState.time > 6 && simulationState.time < 18;
+            if (isDaytime) {
+                elements.dayNightIcon.innerHTML = '<i data-lucide="sun" class="text-yellow-400"></i>';
+                elements.timePeriod.textContent = 'نهار';
+            } else {
+                elements.dayNightIcon.innerHTML = '<i data-lucide="moon" class="text-blue-300"></i>';
+                elements.timePeriod.textContent = 'ليل';
+            }
+            lucide.createIcons();
+        }
+
+        // Calculate PV output based on time
+        function calculatePvOutput() {
+            let solarFactor = 0;
+            if (simulationState.time >= 6 && simulationState.time <= 18) {
+                const hourRatio = (simulationState.time - 6) / 12;
+                solarFactor = Math.pow(Math.sin(hourRatio * Math.PI), 1.2);
+                
+                // Reduce output in early morning and late afternoon
+                if (simulationState.time < 8 || simulationState.time > 16) solarFactor *= 0.7;
+            }
+            return solarFactor * SYSTEM_SPECS.pvCapacity;
+        }
+
+        // Update load controls based on time and battery
+        function updateLoadControls() {
+            const isDaytime = simulationState.time > 6 && simulationState.time < 18;
+            const isNighttime = simulationState.time >= 18 || simulationState.time <= 6;
+            
+            // Auto control for lights (on at night)
+            if (isNighttime && simulationState.batterySoc > 10) {
+                simulationState.activeLoads.lights = true;
+            } else if (isDaytime) {
+                simulationState.activeLoads.lights = false;
+            }
+            
+            // Auto control for pump (only during daytime with sufficient battery)
+            if (!isDaytime && simulationState.activeLoads.pump) {
+                simulationState.activeLoads.pump = false;
+            }
+            
+            // Auto control for charging (only with sufficient battery)
+            if (simulationState.batterySoc <= 20 && simulationState.activeLoads.charging) {
+                simulationState.activeLoads.charging = false;
+            }
+            
+            updateLoadIndicators();
+        }
+
+        // Update load indicators in UI
+        function updateLoadIndicators() {
+            // Update pump
+            if (simulationState.activeLoads.pump) {
+                loadControls.pump.toggle.classList.remove('border-slate-200', 'bg-white');
+                loadControls.pump.toggle.classList.add('border-blue-500', 'bg-blue-50');
+                loadControls.pump.indicator.classList.remove('bg-slate-300');
+                loadControls.pump.indicator.classList.add('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.pump.status.classList.remove('hidden');
+            } else {
+                loadControls.pump.toggle.classList.remove('border-blue-500', 'bg-blue-50');
+                loadControls.pump.toggle.classList.add('border-slate-200', 'bg-white');
+                loadControls.pump.indicator.classList.remove('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.pump.indicator.classList.add('bg-slate-300');
+                loadControls.pump.status.classList.add('hidden');
+            }
+            
+            // Update lights
+            if (simulationState.activeLoads.lights) {
+                loadControls.lights.toggle.classList.remove('border-slate-200', 'bg-white');
+                loadControls.lights.toggle.classList.add('border-yellow-500', 'bg-yellow-50');
+                loadControls.lights.indicator.classList.remove('bg-slate-300');
+                loadControls.lights.indicator.classList.add('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.lights.status.classList.remove('hidden');
+            } else {
+                loadControls.lights.toggle.classList.remove('border-yellow-500', 'bg-yellow-50');
+                loadControls.lights.toggle.classList.add('border-slate-200', 'bg-white');
+                loadControls.lights.indicator.classList.remove('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.lights.indicator.classList.add('bg-slate-300');
+                loadControls.lights.status.classList.add('hidden');
+            }
+            
+            // Update charging
+            if (simulationState.activeLoads.charging) {
+                loadControls.charging.toggle.classList.remove('border-slate-200', 'bg-white');
+                loadControls.charging.toggle.classList.add('border-purple-500', 'bg-purple-50');
+                loadControls.charging.indicator.classList.remove('bg-slate-300');
+                loadControls.charging.indicator.classList.add('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.charging.status.classList.remove('hidden');
+            } else {
+                loadControls.charging.toggle.classList.remove('border-purple-500', 'bg-purple-50');
+                loadControls.charging.toggle.classList.add('border-slate-200', 'bg-white');
+                loadControls.charging.indicator.classList.remove('bg-green-500', 'shadow-[0_0_8px_rgba(34,197,94,0.6)]');
+                loadControls.charging.indicator.classList.add('bg-slate-300');
+                loadControls.charging.status.classList.add('hidden');
+            }
+        }
+
+        // Calculate total load
+        function calculateTotalLoad() {
+            let currentLoad = 0;
+            if (simulationState.activeLoads.pump) currentLoad += SYSTEM_SPECS.loads.pump;
+            if (simulationState.activeLoads.lights) currentLoad += SYSTEM_SPECS.loads.lights;
+            if (simulationState.activeLoads.charging) currentLoad += SYSTEM_SPECS.loads.charging;
+            return currentLoad;
+        }
+
+        // Update battery state
+        function updateBattery() {
+            // Energy flow = Generation - Consumption
+            const netPower = (simulationState.pvOutput * SYSTEM_EFFICIENCY.charging) - 
+                            (simulationState.totalLoad / SYSTEM_EFFICIENCY.discharge);
+            
+            // Delta (kWh) for this 15 min step (0.25h)
+            const energyStep = netPower * 0.25;
+            
+            // Update battery SOC
+            const socChange = (energyStep / SYSTEM_SPECS.batteryCapacity) * 100;
+            simulationState.batterySoc += socChange;
+            
+            // Clamp between 0 and 100
+            simulationState.batterySoc = Math.min(Math.max(simulationState.batterySoc, 0), 100);
+            
+            // Update energy statistics
+            if (netPower > 0) {
+                simulationState.energyProduced += netPower * 0.25;
+            } else {
+                simulationState.energyConsumed += Math.abs(netPower) * 0.25;
+            }
+            
+            // Update operation hours if any load is active
+            if (simulationState.totalLoad > 0) {
+                simulationState.operationHours += 0.25;
+            }
+        }
+
+        // Update system status
+        function updateSystemStatus() {
+            // Check for overload
+            if (simulationState.totalLoad > SYSTEM_SPECS.inverterCapacity) {
+                simulationState.gridStatus = 'OVERLOAD';
+                elements.systemStatus.textContent = 'حمولة زائدة';
+                elements.systemStatus.className = 'font-bold px-2 py-1 rounded bg-red-900 text-red-400';
+            } 
+            // Check for blackout
+            else if (simulationState.batterySoc <= 0 && simulationState.pvOutput < simulationState.totalLoad) {
+                simulationState.gridStatus = 'BLACKOUT';
+                elements.systemStatus.textContent = 'انقطاع تام';
+                elements.systemStatus.className = 'font-bold px-2 py-1 rounded bg-red-900 text-red-400';
+            }
+            // Check for low battery
+            else if (simulationState.batterySoc <= 10) {
+                simulationState.gridStatus = 'LOW_BATTERY';
+                elements.systemStatus.textContent = 'بطارية منخفضة';
+                elements.systemStatus.className = 'font-bold px-2 py-1 rounded bg-orange-900 text-orange-400 battery-warning';
+            }
+            // Normal operation
+            else {
+                simulationState.gridStatus = 'Normal';
+                elements.systemStatus.textContent = 'مستقر';
+                elements.systemStatus.className = 'font-bold px-2 py-1 rounded bg-green-900 text-green-400';
+            }
+            
+            // Update net flow
+            const netFlow = simulationState.pvOutput - simulationState.totalLoad;
+            elements.netFlow.textContent = `${netFlow.toFixed(2)} kW`;
+            if (netFlow >= 0) {
+                elements.netFlow.className = 'font-mono dir-ltr text-green-400';
+            } else {
+                elements.netFlow.className = 'font-mono dir-ltr text-red-400';
+            }
+            
+            // Update system temperature (simulated)
+            const baseTemp = 25;
+            const loadEffect = simulationState.totalLoad * 2;
+            const pvEffect = simulationState.pvOutput * 0.5;
+            const batteryEffect = (50 - simulationState.batterySoc) * 0.1;
+            const systemTemp = baseTemp + loadEffect + pvEffect + batteryEffect;
+            elements.systemTemp.textContent = `${systemTemp.toFixed(1)}°C`;
+            
+            // Update inverter glow effect
+            if (simulationState.totalLoad > 0) {
+                elements.inverter.classList.add('glow');
+                elements.inverter.querySelector('i').classList.remove('text-slate-500');
+                elements.inverter.querySelector('i').classList.add('text-blue-400');
+            } else {
+                elements.inverter.classList.remove('glow');
+                elements.inverter.querySelector('i').classList.remove('text-blue-400');
+                elements.inverter.querySelector('i').classList.add('text-slate-500');
+            }
+        }
+
+        // Update beneficiary counts
+        function updateBeneficiaryCounts() {
+            // Water beneficiaries (based on pump operation)
+            if (simulationState.activeLoads.pump) {
+                beneficiaryElements.water.textContent = '300';
+            } else {
+                beneficiaryElements.water.textContent = '0';
+            }
+            
+            // Light beneficiaries (based on lights operation)
+            if (simulationState.activeLoads.lights) {
+                beneficiaryElements.light.textContent = '500';
+            } else {
+                beneficiaryElements.light.textContent = '0';
+            }
+            
+            // Charge beneficiaries (based on charging operation)
+            if (simulationState.activeLoads.charging) {
+                beneficiaryElements.charge.textContent = '100';
+            } else {
+                beneficiaryElements.charge.textContent = '0';
+            }
+            
+            // CO2 saved (based on energy produced)
+            const co2Saved = simulationState.energyProduced * 0.5; // kg CO2 per kWh
+            beneficiaryElements.co2.textContent = co2Saved.toFixed(1);
+        }
+
+        // Update all displays
+        function updateDisplays() {
+            // Update PV displays
+            elements.pvOutput.textContent = simulationState.pvOutput.toFixed(2);
+            const pvPercentage = (simulationState.pvOutput / SYSTEM_SPECS.pvCapacity) * 100;
+            elements.pvProgress.style.width = `${pvPercentage}%`;
+            elements.pvEfficiency.textContent = `كفاءة: ${Math.round(pvPercentage)}%`;
+            
+            if (simulationState.pvOutput > 0) {
+                elements.pvIndicator.className = 'absolute top-0 left-0 w-2 h-full bg-yellow-400';
+            } else {
+                elements.pvIndicator.className = 'absolute top-0 left-0 w-2 h-full bg-slate-300';
+            }
+            
+            // Update battery displays
+            elements.batterySoc.textContent = `${Math.round(simulationState.batterySoc)}%`;
+            elements.batteryProgress.style.width = `${simulationState.batterySoc}%`;
+            
+            if (simulationState.batterySoc > 20) {
+                elements.batteryIndicator.className = 'absolute top-0 left-0 w-2 h-full bg-green-500';
+                elements.batteryProgress.className = 'h-4 rounded-full transition-all duration-300 bg-green-500';
+            } else {
+                elements.batteryIndicator.className = 'absolute top-0 left-0 w-2 h-full bg-red-500';
+                elements.batteryProgress.className = 'h-4 rounded-full transition-all duration-300 bg-red-500';
+            }
+            
+            if (simulationState.pvOutput > simulationState.totalLoad) {
+                elements.batteryStatus.textContent = '⚡ جاري الشحن';
+            } else if (simulationState.totalLoad > 0) {
+                elements.batteryStatus.textContent = '🔻 جاري التفريغ';
+            } else {
+                elements.batteryStatus.textContent = 'خامل';
+            }
+            
+            // Update load display
+            elements.currentLoad.textContent = simulationState.totalLoad.toFixed(2);
+            
+            // Update energy statistics
+            elements.energyProduced.textContent = `${simulationState.energyProduced.toFixed(2)} kWh`;
+            elements.energyConsumed.textContent = `${simulationState.energyConsumed.toFixed(2)} kWh`;
+            elements.netEnergy.textContent = `${(simulationState.energyProduced - simulationState.energyConsumed).toFixed(2)} kWh`;
+            elements.operationHours.textContent = Math.round(simulationState.operationHours);
+            
+            // Update beneficiary counts
+            updateBeneficiaryCounts();
+        }
+
+        // Simulation step
+        function simulationStep() {
+            // Advance time
+            simulationState.time += 0.25;
+            if (simulationState.time >= 24) simulationState.time = 0;
+            
+            updateTimeDisplay();
+            
+            // Update PV output
+            simulationState.pvOutput = calculatePvOutput();
+            
+            // Update load controls based on time and battery
+            updateLoadControls();
+            
+            // Calculate total load
+            simulationState.totalLoad = calculateTotalLoad();
+            
+            // Update battery
+            updateBattery();
+            
+            // Update system status
+            updateSystemStatus();
+            
+            // Update all displays
+            updateDisplays();
+        }
+
+        // Toggle simulation
+        function toggleSimulation() {
+            simulationState.isSimulating = !simulationState.isSimulating;
+            
+            if (simulationState.isSimulating) {
+                elements.simulationToggle.textContent = 'إيقاف مؤقت ⏸';
+                elements.simulationToggle.classList.remove('bg-green-100', 'text-green-600');
+                elements.simulationToggle.classList.add('bg-red-100', 'text-red-600');
+                
+                // Start simulation loop
+                simulationState.intervalId = setInterval(simulationStep, 500);
+            } else {
+                elements.simulationToggle.textContent = 'تشغيل المحاكاة ▶';
+                elements.simulationToggle.classList.remove('bg-red-100', 'text-red-600');
+                elements.simulationToggle.classList.add('bg-green-100', 'text-green-600');
+                
+                // Stop simulation loop
+                clearInterval(simulationState.intervalId);
+            }
+        }
+
+        // Toggle load
+        function toggleLoad(load) {
+            // Check constraints before toggling
+            const isDaytime = simulationState.time > 6 && simulationState.time < 18;
+            
+            if (load === 'pump' && !isDaytime) {
+                // Show warning for pump at night
+                elements.systemWarnings.innerHTML = `
+                    <div class="font-bold mb-1 flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 text-orange-500"></i>
+                        تنبيه
+                    </div>
+                    <p>المضخة لا يمكن تشغيلها ليلاً للحفاظ على البطارية. الرجاء تشغيلها خلال النهار (6:00 - 18:00).</p>
+                `;
+                elements.systemWarnings.className = 'mt-4 p-4 bg-orange-50 rounded-lg border border-orange-200 text-sm text-orange-800';
+                lucide.createIcons();
+                return;
+            }
+            
+            if (load === 'charging' && simulationState.batterySoc <= 20) {
+                // Show warning for charging with low battery
+                elements.systemWarnings.innerHTML = `
+                    <div class="font-bold mb-1 flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 text-orange-500"></i>
+                        تنبيه
+                    </div>
+                    <p>لا يمكن تشغيل محطة الشحن عندما تكون البطارية أقل من 20%.</p>
+                `;
+                elements.systemWarnings.className = 'mt-4 p-4 bg-orange-50 rounded-lg border border-orange-200 text-sm text-orange-800';
+                lucide.createIcons();
+                return;
+            }
+            
+            // Toggle the load
+            simulationState.activeLoads[load] = !simulationState.activeLoads[load];
+            updateLoadIndicators();
+            
+            // Reset warnings if successful
+            elements.systemWarnings.innerHTML = `
+                <div class="font-bold mb-1 flex items-center gap-2">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                    تعليمات التشغيل
+                </div>
+                <ul class="list-disc mr-4 mt-1 space-y-1">
+                    <li>المضخة تعمل نهاراً فقط (6:00 - 18:00)</li>
+                    <li>الإنارة تعمل تلقائياً ليلاً (18:00 - 6:00)</li>
+                    <li>محطة الشحن متاحة عندما تكون البطارية فوق 20%</li>
+                </ul>
+            `;
+            elements.systemWarnings.className = 'mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800';
+            lucide.createIcons();
+        }
+
+        // Initialize the simulation
+        function initSimulation() {
+            updateTimeDisplay();
+            updateLoadIndicators();
+            updateDisplays();
+            
+            // Add event listeners
+            elements.simulationToggle.addEventListener('click', toggleSimulation);
+            
+            loadControls.pump.toggle.addEventListener('click', () => toggleLoad('pump'));
+            loadControls.lights.toggle.addEventListener('click', () => toggleLoad('lights'));
+            loadControls.charging.toggle.addEventListener('click', () => toggleLoad('charging'));
+            
+            // Initial simulation step to set up displays
+            simulationStep();
+        }
+
+        // Start the simulation when page loads
+        document.addEventListener('DOMContentLoaded', initSimulation);
+    </script>
+</body>
+</html>
